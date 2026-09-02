@@ -1,2 +1,4 @@
 node_modules
 .env
+
+smartdeals-firebase-admin-sdk-key.json
