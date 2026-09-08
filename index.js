@@ -1,44 +1,49 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const morgan = require('morgan');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 3000;
 
 
-const admin = require("firebase-admin");
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const serviceAccount = require("./smartdeals-firebase-admin-sdk-key.json");
-
-admin.initializeApp({
-    credential: admin.cert(serviceAccount)
+initializeApp({
+    credential: cert(serviceAccount)
 });
 
 
 app.use(cors());
 app.use(express.json());
-
-const logger = (req, res, next) => {
-    console.log('logging information');
-    next();
-}
+app.use(morgan('dev'))
 
 const verifyFirebaseToken = async (req, res, next) => {
-    if (!req.headers.authorization) {
-        return res.status(401).send({ message: 'unauthorized access' })
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send({
+            message: "unauthorized access"
+        });
     }
-    const token = req.headers.authorization.split(' ')[1];
+    const token = authHeader.split(" ")[1];
     if (!token) {
-        return res.status(401).send({ message: 'unauthorized access' })
+        return res.status(401).send({
+            message: "unauthorized access"
+        });
     }
     try {
-        const userInfo = await admin.auth().verifyIdToken(token);
-        console.log('after token validation', userInfo);
+        const userInfo = await getAuth().verifyIdToken(token);
+        console.log("Token verified:", userInfo.email);
+        req.user = userInfo;
         next();
+    } catch (error) {
+        console.log("Firebase Token Error:", error.message);
+        return res.status(401).send({
+            message: "unauthorized access"
+        });
     }
-    catch {
-        return res.status(401).send({ message: 'unauthorized access' })
-    }
-}
+};
 
 
 
@@ -132,22 +137,26 @@ async function run() {
             res.send(result)
         })
 
+
         // bids related api
-        app.get('/bids', logger, verifyFirebaseToken, async (req, res) => {
-            // console.log(req.headers);
+        app.get('/bids', verifyFirebaseToken, async (req, res) => {
             const email = req.query.email;
+            console.log("Query email:", email);
+            console.log("Token email:", req.user.email);
             const query = {};
             if (email) {
                 query.buyer_email = email;
             }
-            const cursor = bidsCollection.find(query);
-            const result = await cursor.toArray();
-            res.send(result)
-        })
-        // app.get('/bids', async(req, res)=>{
+            const result = await bidsCollection.find(query).toArray();
+            res.send(result);
+        });
+
+        // app.get('/bids', verifyFirebaseToken, async (req, res) => {
+        //     console.log('headers',req.headers);
+        //     const email = req.query.email;
         //     const query = {};
-        //     if(query.email){
-        //         query.buyer_email = email
+        //     if (email) {
+        //         query.buyer_email = email;
         //     }
         //     const cursor = bidsCollection.find(query);
         //     const result = await cursor.toArray();
