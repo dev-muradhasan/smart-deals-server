@@ -140,6 +140,7 @@ async function run() {
 
         // bids related api
         app.get('/bids', verifyFirebaseToken, async (req, res) => {
+            console.log('headers', req);
             const email = req.query.email;
             console.log("Query email:", email);
             console.log("Token email:", req.user.email);
@@ -163,7 +164,7 @@ async function run() {
         //     res.send(result)
         // })
 
-        app.get('/products/bids/:productId', async (req, res) => {
+        app.get('/products/bids/:productId', verifyFirebaseToken, async (req, res) => {
             const productId = req.params.productId;
             const query = { productId: productId };
             const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
